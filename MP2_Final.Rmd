@@ -1,0 +1,441 @@
+---
+title: "MiniProject2"
+author: "Ojaas Hampiholi"
+date: "3/22/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(broom)
+library(MASS)
+library(arm)
+library(mgcv)
+library(boot)
+library(pROC)
+```
+
+```{r}
+DFP = read.csv("DFP_WTHH_release.csv")
+#head(DFP)
+
+loyalDemocrats = DFP[DFP$presvote16post == 1 & DFP$house3 == 1,]
+loyalRepublicans = DFP[DFP$presvote16post == 2 & DFP$house3 == 2,]
+switchToD = DFP[DFP$presvote16post != 1 & DFP$house3 == 1,]
+switchToR = DFP[DFP$presvote16post != 2 & DFP$house3 == 2,]
+Switchers = rbind(switchToD, switchToR)
+
+myvars <- c("M4A", "GREENJOB", "WEALTH", "MARLEG", "ICE", "GUNS", "POP_1", "POP_2", "POP_3", "weight_DFP")
+switchToD <- switchToD[myvars]
+switchToR <- switchToR[myvars]
+Switchers <- Switchers[myvars]
+loyalDemocrats <- loyalDemocrats[myvars]
+loyalRepublicans <- loyalRepublicans[myvars]
+```
+
+
+## Question 1:
+
+```{r, fig.width=12, fig.height=8}
+switchToD$VoterType= "SwitchToD"
+switchToR$VoterType= "SwitchToR"
+n = nrow(DFP)
+
+nSToD = nrow(switchToD)
+
+DweightedM4A = group_by(switchToD, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedM4A)[1]<-paste("Values")
+DweightedM4A$IssueVariable= "M4A"
+DweightedM4A <- DweightedM4A[c(3,1,2)]
+
+DweightedGREENJOB = group_by(switchToD, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedGREENJOB)[1]<-paste("Values")
+DweightedGREENJOB$IssueVariable= "GREENJOB"
+DweightedGREENJOB <- DweightedGREENJOB[c(3,1,2)]
+
+DweightedWEALTH = group_by(switchToD, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedWEALTH)[1]<-paste("Values")
+DweightedWEALTH$IssueVariable= "WEALTH"
+DweightedWEALTH <- DweightedWEALTH[c(3,1,2)]
+
+DweightedMARLEG = group_by(switchToD, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedMARLEG)[1]<-paste("Values")
+DweightedMARLEG$IssueVariable= "MARLEG"
+DweightedMARLEG <- DweightedMARLEG[c(3,1,2)]
+
+DweightedICE = group_by(switchToD, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedICE)[1]<-paste("Values")
+DweightedICE$IssueVariable= "ICE"
+DweightedICE <- DweightedICE[c(3,1,2)]
+
+DweightedGUNS = group_by(switchToD, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToD)
+names(DweightedGUNS)[1]<-paste("Values")
+DweightedGUNS$IssueVariable= "GUNS"
+DweightedGUNS <- DweightedGUNS[c(3,1,2)]
+
+newSToD = rbind(DweightedM4A,DweightedGREENJOB)
+newSToD = rbind(newSToD,DweightedWEALTH)
+newSToD = rbind(newSToD,DweightedMARLEG)
+newSToD = rbind(newSToD,DweightedICE)
+newSToD = rbind(newSToD,DweightedGUNS)
+newSToD$SwitchType= "SwitchToD"
+newSToD <- newSToD[c(4,1,2,3)]
+newSToD = na.omit(newSToD)
+
+nSToR = nrow(switchToR)
+
+RweightedM4A = group_by(switchToR, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedM4A)[1]<-paste("Values")
+RweightedM4A$IssueVariable= "M4A"
+RweightedM4A <- RweightedM4A[c(3,1,2)]
+
+RweightedGREENJOB = group_by(switchToR, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedGREENJOB)[1]<-paste("Values")
+RweightedGREENJOB$IssueVariable= "GREENJOB"
+RweightedGREENJOB <- RweightedGREENJOB[c(3,1,2)]
+
+RweightedWEALTH = group_by(switchToR, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedWEALTH)[1]<-paste("Values")
+RweightedWEALTH$IssueVariable= "WEALTH"
+RweightedWEALTH <- RweightedWEALTH[c(3,1,2)]
+
+RweightedMARLEG = group_by(switchToR, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedMARLEG)[1]<-paste("Values")
+RweightedMARLEG$IssueVariable= "MARLEG"
+RweightedMARLEG <- RweightedMARLEG[c(3,1,2)]
+
+RweightedICE = group_by(switchToR, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedICE)[1]<-paste("Values")
+RweightedICE$IssueVariable= "ICE"
+RweightedICE <- RweightedICE[c(3,1,2)]
+
+RweightedGUNS = group_by(switchToR, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSToR)
+names(RweightedGUNS)[1]<-paste("Values")
+RweightedGUNS$IssueVariable= "GUNS"
+RweightedGUNS <- RweightedGUNS[c(3,1,2)]
+
+newSToR = rbind(RweightedM4A,RweightedGREENJOB)
+newSToR = rbind(newSToR,RweightedWEALTH)
+newSToR = rbind(newSToR,RweightedMARLEG)
+newSToR = rbind(newSToR,RweightedICE)
+newSToR = rbind(newSToR,RweightedGUNS)
+newSToR$SwitchType= "SwitchToR"
+newSToR <- newSToR[c(4,1,2,3)]
+newSToR = na.omit(newSToR)
+
+question1Data = rbind(newSToD, newSToR)
+question1Data = question1Data[question1Data$Values != 6, ]
+
+ggplot(question1Data, aes(x = Values, y = WeightedValues, color = SwitchType)) + geom_point() +
+  geom_smooth(method = "loess",se = FALSE,span = 1) + 
+  facet_wrap(.~ IssueVariable) + ggtitle("Switch Voter comparision wrt Issue Variables")
+```
+
+## Question 2
+
+```{r, fig.width=12, fig.height=8}
+nSwitchers = nrow(Switchers)
+
+SwitchersM4A = group_by(Switchers, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(Switchers, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(Switchers, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(Switchers, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(Switchers, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(Switchers, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nSwitchers)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newSwitchers = rbind(SwitchersM4A,SwitchersGREENJOB)
+newSwitchers = rbind(newSwitchers,SwitchersWEALTH)
+newSwitchers = rbind(newSwitchers,SwitchersMARLEG)
+newSwitchers = rbind(newSwitchers,SwitchersICE)
+newSwitchers = rbind(newSwitchers,SwitchersGUNS)
+newSwitchers$SwitchType= "Switchers"
+newSwitchers <- newSwitchers[c(4,3,1,2)]
+newSwitchers = na.omit(newSwitchers)
+#head(newSwitchers)
+
+nDemocrats = nrow(loyalDemocrats)
+
+SwitchersM4A = group_by(loyalDemocrats, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(loyalDemocrats, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(loyalDemocrats, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(loyalDemocrats, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(loyalDemocrats, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(loyalDemocrats, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nDemocrats)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newDemocrats = rbind(SwitchersM4A,SwitchersGREENJOB)
+newDemocrats = rbind(newDemocrats,SwitchersWEALTH)
+newDemocrats = rbind(newDemocrats,SwitchersMARLEG)
+newDemocrats = rbind(newDemocrats,SwitchersICE)
+newDemocrats = rbind(newDemocrats,SwitchersGUNS)
+newDemocrats$SwitchType= "Democrats"
+newDemocrats <- newDemocrats[c(4,3,1,2)]
+newDemocrats = na.omit(newDemocrats)
+#head(newDemocrats)
+
+nRepublicans = nrow(loyalRepublicans)
+
+SwitchersM4A = group_by(loyalRepublicans, M4A) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersM4A)[1]<-paste("Values")
+SwitchersM4A$IssueVariable= "M4A"
+
+SwitchersGREENJOB = group_by(loyalRepublicans, GREENJOB) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersGREENJOB)[1]<-paste("Values")
+SwitchersGREENJOB$IssueVariable= "GREENJOB"
+
+SwitchersWEALTH = group_by(loyalRepublicans, WEALTH) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersWEALTH)[1]<-paste("Values")
+SwitchersWEALTH$IssueVariable= "WEALTH"
+
+SwitchersMARLEG = group_by(loyalRepublicans, MARLEG) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersMARLEG)[1]<-paste("Values")
+SwitchersMARLEG$IssueVariable= "MARLEG"
+
+SwitchersICE = group_by(loyalRepublicans, ICE) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersICE)[1]<-paste("Values")
+SwitchersICE$IssueVariable= "ICE"
+
+SwitchersGUNS = group_by(loyalRepublicans, GUNS) %>% summarise(`WeightedValues` = sum(weight_DFP)/nRepublicans)
+names(SwitchersGUNS)[1]<-paste("Values")
+SwitchersGUNS$IssueVariable= "GUNS"
+
+newRepublicans = rbind(SwitchersM4A,SwitchersGREENJOB)
+newRepublicans = rbind(newRepublicans,SwitchersWEALTH)
+newRepublicans = rbind(newRepublicans,SwitchersMARLEG)
+newRepublicans = rbind(newRepublicans,SwitchersICE)
+newRepublicans = rbind(newRepublicans,SwitchersGUNS)
+newRepublicans$SwitchType= "Republicans"
+newRepublicans <- newRepublicans[c(4,3,1,2)]
+newRepublicans = na.omit(newRepublicans)
+#head(newRepublicans)
+
+question2Data = rbind(newSwitchers, newDemocrats)
+question2Data = rbind(question2Data, newRepublicans)
+question2Data = question2Data[question2Data$Values != 6,]
+
+ggplot(question2Data, aes(x = Values, y = WeightedValues, color = SwitchType)) + geom_point() +
+  geom_smooth(method = "loess",se = FALSE, span = 1) + 
+  facet_wrap(.~ IssueVariable) + ggtitle("Comparision between Voter Groups on Issue Variables")
+```
+
+## Question 3
+
+## Question 3 Part A : Model based on Issue Variables
+
+
+```{r}
+myvars <- c("M4A", "GREENJOB", "WEALTH", "MARLEG", "ICE", "GUNS", "weight_DFP")
+
+Switchers1 <- Switchers[myvars]
+Switchers1$SwitchType= 1
+Switchers1 = na.omit(Switchers1)
+loyalDemocrats1 <- loyalDemocrats[myvars]
+loyalDemocrats1$SwitchType= 0
+loyalDemocrats1 = na.omit(loyalDemocrats1)
+loyalRepublicans1 <- loyalRepublicans[myvars]
+loyalRepublicans1$SwitchType= 0
+loyalRepublicans1 = na.omit(loyalRepublicans1)
+
+issueVariablesData = rbind(Switchers1, loyalRepublicans1)
+issueVariablesData = rbind(issueVariablesData, loyalDemocrats1)
+#logit.model.1 = glm(SwitchType ~M4A * GUNS * GREENJOB * MARLEG * WEALTH * ICE,family = "quasibinomial",
+logit.model.1 = glm(SwitchType ~M4A + GUNS + GREENJOB + MARLEG + WEALTH + ICE,family = "quasibinomial",
+                               weights = weight_DFP, data = issueVariablesData)
+
+```
+
+
+
+```{r, fig.width=12, fig.height=10}
+myvars <- c("M4A", "GREENJOB", "WEALTH", "MARLEG", "ICE", "GUNS", "weight_DFP")
+
+Switchers1 <- Switchers[myvars]
+Switchers1$SwitchType= 1
+Switchers1 = na.omit(Switchers1)
+loyalDemocrats1 <- loyalDemocrats[myvars]
+loyalDemocrats1$SwitchType= 0
+loyalDemocrats1 = na.omit(loyalDemocrats1)
+loyalRepublicans1 <- loyalRepublicans[myvars]
+loyalRepublicans1$SwitchType= 0
+loyalRepublicans1 = na.omit(loyalRepublicans1)
+
+issueVariablesData = rbind(Switchers1, loyalRepublicans1)
+issueVariablesData = rbind(issueVariablesData, loyalDemocrats1)
+
+IVLogit = glm(SwitchType ~ M4A + GREENJOB + MARLEG + WEALTH + ICE + GUNS,family = quasibinomial, 
+                               weights = weight_DFP, data = issueVariablesData)
+
+
+pred = predict(IVLogit, type = "response", newdata = issueVariablesData)
+predicted_logit_model_1 <- ifelse(pred > 0.5, 1, 0)
+accuracy <- mean(issueVariablesData$SwitchType == predicted_logit_model_1 )
+accuracy_df <- data.frame(Model = "Model with 1 predictor (GREENJOB)", Accuracy = accuracy, stringsAsFactors = FALSE)
+
+print(paste("Train accuracy for model with 1 predictor is:",round(accuracy*100,2),"%"))
+
+library(gridExtra)
+
+issueVariablesData = issueVariablesData[issueVariablesData$M4A != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$GREENJOB != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$MARLEG != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$GUNS != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$ICE != 6, ]
+issueVariablesData = issueVariablesData[issueVariablesData$WEALTH != 6, ]
+
+
+sigmoid = function(x){
+ coe = coef(IVLogit)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+p1 = ggplot(issueVariablesData,aes(x = M4A, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE) +
+  stat_function(fun = sigmoid, color = 'red')
+
+p2 = ggplot(issueVariablesData,aes(x = GREENJOB, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE)+
+  stat_function(fun = sigmoid, color = 'red')
+
+p3 = ggplot(issueVariablesData,aes(x = WEALTH, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE)+
+  stat_function(fun = sigmoid, color = 'red')
+
+p4 = ggplot(issueVariablesData,aes(x = MARLEG, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE)+
+  stat_function(fun = sigmoid, color = 'red')
+
+p5 = ggplot(issueVariablesData,aes(x = ICE, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE)+
+  stat_function(fun = sigmoid, color = 'red')
+
+p6 = ggplot(issueVariablesData,aes(x = GUNS, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE)+
+  stat_function(fun = sigmoid, color = 'red')
+
+grid.arrange(p1,p2,p3,p4,p5,p6,ncol = 2)
+```
+
+## Question 3 Part B : Model based on Pop Variables
+
+```{r,fig.height=10, fig.width=6}
+myvars <- c("POP_1", "POP_2", "POP_3", "weight_DFP")
+
+Switchers2 <- Switchers[myvars]
+Switchers2$SwitchType= 1
+Switchers2 = na.omit(Switchers2)
+loyalDemocrats2 <- loyalDemocrats[myvars]
+loyalDemocrats2$SwitchType= 0
+loyalDemocrats2 = na.omit(loyalDemocrats2)
+loyalRepublicans2 <- loyalRepublicans[myvars]
+loyalRepublicans2$SwitchType= 0
+loyalRepublicans2 = na.omit(loyalRepublicans2)
+
+popVariablesData = rbind(Switchers2, loyalRepublicans2)
+popVariablesData = rbind(popVariablesData, loyalDemocrats2)
+#issueVariablesData$M4A = issueVariablesData$M4A * issueVariablesData$weight_DFP
+#ggpairs(popVariablesData)
+
+PVLogit = glm(SwitchType ~ POP_1 * POP_2 + POP_3,family = quasibinomial, 
+                               weights = weight_DFP, data = popVariablesData)
+#summary(PVLogit)
+
+pred = predict(PVLogit, type = "response", newdata = popVariablesData)
+predicted_logit_model_1 <- ifelse(pred > 0.5, 1, 0)
+accuracy <- mean(popVariablesData$SwitchType == predicted_logit_model_1 )
+accuracy_df <- data.frame(Model = "Model with 1 predictor (GREENJOB)", Accuracy = accuracy, stringsAsFactors = FALSE)
+
+print(paste("Train accuracy for model with 1 predictor is:",round(accuracy*100,2),"%"))
+
+
+sigmoid2 = function(x){
+ coe = coef(PVLogit)
+ 
+ total_coef = length(coe)
+ y = coe[1]
+ for(i in 2:total_coef)
+ {
+    y = y + coe[i] * x^(i-1)
+ }
+ 
+ return(inv.logit(y))
+}
+
+popVariablesData = popVariablesData[popVariablesData$POP_1 != 6, ]
+popVariablesData = popVariablesData[popVariablesData$POP_2 != 6, ]
+popVariablesData = popVariablesData[popVariablesData$POP_3 != 6, ]
+
+#summary(popVariablesData$POP_1)
+
+
+
+g1 = ggplot(popVariablesData,aes(x = POP_1, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue")+
+  stat_function(fun = sigmoid2, color= "red")
+
+g2 = ggplot(popVariablesData,aes(x = POP_2, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue")+
+  stat_function(fun = sigmoid2, color= "red")
+
+g3 = ggplot(popVariablesData,aes(x = POP_3, y = SwitchType, color = SwitchType)) + 
+  geom_point()+ geom_jitter(width = 0.3, height = 0.05) +
+  geom_smooth(method = 'lm', se = FALSE, color = "blue")+
+  stat_function(fun = sigmoid2, color= "red")
+
+grid.arrange(g1,g2,g3,ncol=1)
+
+```
